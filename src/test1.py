@@ -13,7 +13,7 @@ from torch.utils.data.dataloader import DataLoader
 from torch.utils.data import random_split
 
 #%matplotlib inline
-
+#hello
 
 
 # Define the Neural Network model
