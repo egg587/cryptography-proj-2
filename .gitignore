@@ -1,1 +1,3 @@
 myenv/
+.artifacts/
+src/data/
