@@ -6,11 +6,15 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+import time
+from tqdm import tqdm
 from torchvision.datasets import CIFAR10
 import torchvision.transforms as transforms
 from torchvision.utils import make_grid
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.data import random_split
+
+from concrete.ml.torch.compile import compile_torch_model
 
 #%matplotlib inline
 
@@ -42,7 +46,7 @@ class ImageClass(nn.Module):
         plt.imshow(np.transpose(npimg, (1, 2, 0)))
         plt.show()
 
-    def model_training_func(self, num_of_epochs):
+    def model_training_func(self, num_of_epochs, trainloader, compile_params):
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
@@ -52,6 +56,7 @@ class ImageClass(nn.Module):
             for i, data in enumerate(trainloader, 0):
 
                 inputs, labels = data
+                #inputs, labels = inputs.to(device), labels.to(device)
 
                 outputs = self.forward(inputs)
                 loss = criterion(outputs, labels)
@@ -66,115 +71,113 @@ class ImageClass(nn.Module):
                     running_loss = 0.0
         
         print('Training Completed')
-        return 0
+
+        # Compile the model using Concrete ML
+        n_bits = compile_params.get('n_bits', 6)
+        p_error = compile_params.get('p_error', 0.1)
+
+        # Create a batch of inputs
+        inputs_example, _ = next(iter(trainloader))
+        q_module = compile_torch_model(self, inputs_example, rounding_threshold_bits=n_bits, p_error=p_error)
+
+        return q_module
+
+        
+    def test_with_concrete(self, quantized_module, test_loader, use_sim):
+        """Test a neural network that is quantized and compiled with Concrete ML."""
+
+        # Casting the inputs into int64 is recommended
+        all_y_pred = []
+        all_targets = []
+
+        # Iterate over the test batches and accumulate predictions and ground truth labels in a vector
+        for data, targets in tqdm(test_loader):
+            # print(f"Printing data: {data}")
+            # print(f"Printing targets: {targets}")
+
+            if data.requires_grad:
+                data = data.detach()
+
+            if data.is_cuda:
+                data = data.cpu()
+
+            fhe_mode = "simulate" if use_sim else "execute"
+
+            # Quantize the inputs and cast to appropriate data type
+            data = data.numpy()
+            #data = data.astype(np.int64)
+            predictions = quantized_module.forward(data, fhe=fhe_mode)
+
+            # Convert predictions and targets to numpy arrays
+            targets = targets.numpy()
+
+            # Accumulate the ground truth labels
+            all_y_pred.extend(np.argmax(predictions, axis=1))
+            all_targets.extend(targets)
+        
+        # Convert accumulated lists to numpy arrays
+        all_y_pred = np.array(all_y_pred)
+        all_targets = np.array(all_targets)
+
+        # Compute Accuracy
+        accuracy = np.mean(all_y_pred == all_targets)
+
+        return accuracy
 
 
 if __name__ == "__main__":
 
-    transform = transforms.Compose([transforms.ToTensor(),
-                                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
     # Load a dataset
-    batch_size = 4
-    trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
-                                            download=True, transform=transform)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
-                                            shuffle=True, num_workers=2)
+    batch_size = 2
+    trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=2)
 
-    testset = torchvision.datasets.CIFAR10(root='./data', train=False,
-                                        download=True, transform=transform)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
-                                            shuffle=False, num_workers=2)
+    testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=2)
 
-    classes = ('plane', 'car', 'bird', 'cat',
-            'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
+    # Instantiate the model
     model = ImageClass()
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # model.to(device)
 
-    # Train model on 5 epochs
-    num_epochs = 5
-    model.model_training_func(num_epochs)
+    # Train model and compile with Concrete ML
+    num_epochs = 1
+    compile_params = {'n_bits': 6, 'p_error': 0.1}
+    q_module = model.model_training_func(num_epochs, trainloader, compile_params)
 
-    dataiter = iter(testloader)
-    images, labels = next(dataiter)
+    # Evaluate the model using Concrete ML simulation
+    start_time = time.time()
+    accuracy = model.test_with_concrete(
+        q_module,
+        testloader,
+        use_sim=True
+    )
+    sim_time = time.time() - start_time
 
-    # print images
-    model.imshow(torchvision.utils.make_grid(images))
-    print('Ground Truth Labels: ', ' '.join(f'{classes[labels[j]]:5s}' for j in range(4)))
+    print(f"Simulated FHE execution for {compile_params['n_bits']} bit network accuracy: {accuracy * 100:.2f}%")
+    print(f"Simulation time: {sim_time:.2f} seconds")
 
-    PATH = './cifar_net.pth'
-    torch.save(model.state_dict(), PATH)
+    print(f"Running testing...")
 
-    # model = nn.Sequential(
-    #       nn.Conv2d(3,6,5),
-    #       nn.ReLU(),
-    #       nn.MaxPool2d(2, 2),
-    #       nn.Conv2d(6, 16, 5),
-    #       nn.ReLU(),
-    #       nn.MaxPool2d(2, 2),
-    #       nn.Flatten(),
-    #       nn.Linear(16 * 5 * 5, 120),
-    #       nn.ReLU(),
-    #       nn.Linear(120, 84),
-    #       nn.ReLU(),
-    #       nn.Linear(84, 10))
-    model.load_state_dict(torch.load(PATH))
+    # Generate Keys
+    t = time.time()
+    q_module.fhe_circuit.keygen()
+    print(f"Keygen time: {time.time() - t:.2f}s")
 
-    outputs = model(images)
-    _, predicted = torch.max(outputs, 1)
+    print(f"Length of test set: {len(testloader)}")
 
-    print('Predicted Labels by the model: ', ' '.join(f'{classes[predicted[j]]:5s}'
-                                for j in range(4)))
+    t = time.time()
+    accuracy_test = model.test_with_concrete(
+        q_module, 
+        testloader, 
+        use_sim=False
+    )
 
-    correct = 0
-    total = 0
-    model.eval()
-    with torch.no_grad():
-        for data in testloader:
-            images, labels = data
-            
-            outputs = model(images)
-            
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
-
-    print(f'Model Accuracy on test data : {100 * correct // total} %')
-
-    correct_pred = {classname: 0 for classname in classes}
-    total_pred = {classname: 0 for classname in classes}
-
-    with torch.no_grad():
-        for data in testloader:
-            images, labels = data
-            outputs = model(images)
-            _, predictions = torch.max(outputs, 1)
-            for label, prediction in zip(labels, predictions):
-                if label == prediction:
-                    correct_pred[classes[label]] += 1
-                total_pred[classes[label]] += 1
-
-
-
-    for classname, correct_count in correct_pred.items():
-        accuracy = 100 * float(correct_count) / total_pred[classname]
-        print(f'Accuracy for the class: {classname} is {accuracy} %')
-
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    print(device)
-
-    model.to(device)
-    inputs, labels = data
-    inputs, labels = inputs.to(device), labels.to(device)
-
-
-    # Compile with Concrete
-    # n_bits = 6
-    # q_module = compile_torch_model(model, X_train, rounding_threshold_bits=n_bits, p_error=0.1)
-
-
-
-
-    
-
-
+    elapsed_time = time.time() - t
+    time_per_inference = elapsed_time / len(testloader)
+    accuracy_percentage = accuracy_test * 100
+    print(f"Time per inference in FHE: {time_per_inference:.2f}s with {accuracy_percentage:.2f}% accuracy")
