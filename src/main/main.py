@@ -93,10 +93,10 @@ print(
     f"{concrete_score_difference:.2f}%",
 )
 
-# Create Sklearn logistic regression model
-logmodel = LogisticRegression()
-logmodel.fit(x_train,y_train)
+# # Create Sklearn logistic regression model
+# logmodel = LogisticRegression()
+# logmodel.fit(x_train,y_train)
 
-# Generate predictions using Sklearn model
-predictions = logmodel.predict(x_test)
-print(classification_report(y_test,predictions))
+# # Generate predictions using Sklearn model
+# predictions = logmodel.predict(x_test)
+# print(classification_report(y_test,predictions))
