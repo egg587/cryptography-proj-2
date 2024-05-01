@@ -105,7 +105,7 @@ elif dataset_name == "CIFAR_10":
     param["gamma"] = 0.1
     param["milestones"] = [1, 3]
 
-fp32_vgg = train(fp32_vgg, train_loader, test_loader, param, device=device)
+#fp32_vgg = train(fp32_vgg, train_loader, test_loader, param, device=device)
 
 # Secondly, fine-tuning all the layers.
 for p in list(fp32_vgg.parameters()):
@@ -123,7 +123,7 @@ elif dataset_name == "CIFAR_10":
     param["gamma"] = 0.1
     param["milestones"] = [4]
 
-fp32_vgg = train(fp32_vgg, train_loader, test_loader, param, device=device)
+#fp32_vgg = train(fp32_vgg, train_loader, test_loader, param, device=device)
 
 # Don't need this line since it will save from the train() function
 #torch.save(fp32_vgg.state_dict(), path_to_module)
@@ -177,7 +177,7 @@ param_c100 = {
 train_loader_c100, test_loader_c100 = get_dataloader(param=param_c100)
 
 # Let’s visualize `n` images from CIFAR-100 data-set.
-plot_dataset(test_loader_c100, param_c100)
+#plot_dataset(test_loader_c100, param_c100)
 
 quant_vgg = QuantVGG11(bit=bit, output_size=param_c100["output_size"])
 
@@ -202,15 +202,62 @@ print(f"Top 1 accuracy before fine-tuning = {acc_before_ft * 100:.4f}%")
 # As each batch is shuffled and contains 128 samples, it's a potential subset.
 data_calibration, _ = next(iter(train_loader_c100))
 
-qmodel = fhe_compatibility(quant_vgg, data_calibration)
+#qmodel = fhe_compatibility(quant_vgg, data_calibration)
 
-print(
-    f"With {param_c100['dataset_name']}, the maximum bit-width in the circuit = "
-    f"{qmodel.fhe_circuit.graph.maximum_integer_bit_width()}"
-)
+# print(
+#     f"With {param_c100['dataset_name']}, the maximum bit-width in the circuit = "
+#     f"{qmodel.fhe_circuit.graph.maximum_integer_bit_width()}"
+# )
 
 # Fine-tuning using QAT with Brevitas
-quant_vgg = train(quant_vgg, train_loader_c100, test_loader_c100, param_c100, device=device)
+#quant_vgg = train(quant_vgg, train_loader_c100, test_loader_c100, param_c100, device=device)
 
-# Plot fine-tuning results
-plot_baseline(param_c100, test_loader_c100, device)
+
+# Model settings for classification
+bit = 5
+seed = 42
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+print(f"Device Type: {device}")
+
+param_c100 = {
+    "output_size": 100,
+    "batch_size": 128,
+    "dataset_name": "CIFAR_100",
+    "dataset": datasets.CIFAR100,
+    "std": [0.229, 0.224, 0.225],
+    "mean": [0.485, 0.456, 0.406],
+    "dir": CURR_DIR + "/data/CIFAR_100",
+    "pre_trained_path": "quant/CIFAR_100_quant_state_dict.pt",
+    "seed": 42,
+}
+
+# Loading the pre-trained quantized model.
+quant_vgg_c100 = QuantVGG11(bit=bit, output_size=param_c100["output_size"])
+
+checkpoint = torch.load(
+    f"{param_c100['dir']}/{param_c100['pre_trained_path']}", map_location=device
+)
+quant_vgg_c100.load_state_dict(checkpoint)
+
+# The user can either provide the entire train data-set or a smaller but representative subset.
+
+data_calibration, _ = next(iter(train_loader_c100))
+
+qmodel_c100 = fhe_compatibility(quant_vgg_c100, data_calibration)
+
+print(
+    f"Maximum bit-width in the circuit: {qmodel_c100.fhe_circuit.graph.maximum_integer_bit_width()}"
+)
+
+# Evaluation with Brevitas torch for CIFAR-100.
+acc_torch_c100 = torch_inference(quant_vgg_c100, test_loader_c100, device=device)
+
+
+# Evaluation with the FHE simulation for CIFAR-100.
+acc_fhe_c100 = fhe_simulation_inference(qmodel_c100, test_loader_c100, True)
+
+# FIME
+print(f"Top-1 acc in Brevitas torch : {acc_torch_c100 * 100 :2.2f}%")
+print(f"Top-1 acc with Concrete ML  : {acc_fhe_c100 * 100 :2.2f}%")
