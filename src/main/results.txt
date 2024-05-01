@@ -1,0 +1,10 @@
+Key generation time: 0.6145 seconds
+Sklearn execution time: 0.0027 seconds per sample
+Quantized execution time: 0.0027 seconds per sample
+FHE execution time: 0.0027 seconds per sample
+Sklearn accuracy: 0.7922
+Quantized accuracy: 0.7662
+FHE accuracy: 0.7662
+
+Relative difference between Concrete-ml (quantized clear) and Concrete-ml (FHE) scores: 0.00%
+Relative difference between scikit-learn (clear) and Concrete-ml (FHE) scores: 0.03%

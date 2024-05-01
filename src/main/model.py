@@ -1,22 +1,15 @@
 import time
 import os
-import numpy as np # linear algebra
-import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+import numpy as np 
+import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression as SklearnLogisticRegression
 from sklearn.metrics import accuracy_score
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 from concrete.ml.sklearn import LogisticRegression as ConcreteLogisticRegression
-
-# import matplotlib.pyplot as plt
-# from IPython.display import display
 
 # Find and load dataset
 for dirname, _, filenames in os.walk('data/diabetes.csv'):
@@ -59,23 +52,26 @@ y = df['Outcome']
 # Split data into training and testing sets
 x_train,x_test,y_train,y_test = train_test_split(x,y,test_size=0.3,random_state=101)
 
-# Create Sklearn logistic regression model
+# Create Sklearn Logistic Regression model
 sklearn_logr = SklearnLogisticRegression()
 sklearn_logr.fit(x_train, y_train)
 
 # Predict on the test set using Sklearn model
 y_pred_test = sklearn_logr.predict(x_test)
 
-# Create Concrete-ml logistic regression model with 8 bits precision
+# Create Quantized Concrete-ml Logistic Regression model with 8 bits precision
 concrete_logr = ConcreteLogisticRegression(n_bits=8)
 concrete_logr.fit(x_train, y_train)
 
-# Predict on the test set using Concrete-ml model
+# Predict on the test set using Quantized Concrete-ml model
 y_proba_q = concrete_logr.predict_proba(x_test)[:, 1]
 y_pred_q = concrete_logr.predict(x_test)
 
 # Compile Concrete-ml model to FHE
 fhe_circuit = concrete_logr.compile(x_train)
+
+# Output FHE model to file
+# TODO: output dataset to a file
 
 print(f"Generating a key for an {fhe_circuit.graph.maximum_integer_bit_width()}-bit circuit")
 
@@ -84,10 +80,20 @@ time_begin = time.time()
 fhe_circuit.client.keygen(force=False)
 print(f"Key generation time: {time.time() - time_begin:.4f} seconds")
 
-# Measure execution time per sample for FHE prediction
+# Measure execution time for Sklearn prediction
+time_begin = time.time()
+y_pred_test = sklearn_logr.predict(x_test)
+print(f"Sklearn execution time: {(time.time() - time_begin) / len(x_test):.4f} seconds per sample")
+
+# Measure execution time for Quantized Concrete-ml prediction
+time_begin = time.time()
+y_pred_q = concrete_logr.predict(x_test)
+print(f"Quantized execution time: {(time.time() - time_begin) / len(x_test):.4f} seconds per sample")
+
+# Measure execution time for Concrete-ml FHE prediction
 time_begin = time.time()
 y_pred_fhe = concrete_logr.predict(x_test, fhe="execute")
-print(f"Execution time: {(time.time() - time_begin) / len(x_test):.4f} seconds per sample")
+print(f"FHE execution time: {(time.time() - time_begin) / len(x_test):.4f} seconds per sample")
 
 # Calculate accuracy of the models
 sklearn_accuracy = accuracy_score(y_test, y_pred_test)
@@ -95,8 +101,8 @@ quantized_accuracy = accuracy_score(y_test, y_pred_q)
 fhe_accuracy = accuracy_score(y_test, y_pred_fhe)
 
 print(f"Sklearn accuracy: {sklearn_accuracy:.4f}")
-print(f"Quantized Clear Accuracy: {quantized_accuracy:.4f}")
-print(f"FHE Accuracy: {fhe_accuracy:.4f}")
+print(f"Quantized accuracy: {quantized_accuracy:.4f}")
+print(f"FHE accuracy: {fhe_accuracy:.4f}")
 
 # Measure the error of the FHE quantized model with respect to the clear quantized model
 concrete_score_difference = abs(fhe_accuracy - quantized_accuracy)
@@ -112,14 +118,18 @@ print(
     f"{score_difference:.2f}%",
 )
 
-# # Create Sklearn logistic regression model
-# logmodel = LogisticRegression()
-# logmodel.fit(x_train,y_train)
-
-# # Generate predictions using Sklearn model
-# predictions = logmodel.predict(x_test)
-# print(classification_report(y_test,predictions))
-
-# TODO: output comparison of the two models to a file
-# TODO: output dataset to a file
-# TODO: print accuracy and time taken
+# Create file to store execution times and accuracy
+with open("results.txt", "w") as f:
+    f.write(f"Key generation time: {time.time() - time_begin:.4f} seconds\n")
+    f.write(f"Sklearn execution time: {(time.time() - time_begin) / len(x_test):.4f} seconds per sample\n")
+    f.write(f"Quantized execution time: {(time.time() - time_begin) / len(x_test):.4f} seconds per sample\n")
+    f.write(f"FHE execution time: {(time.time() - time_begin) / len(x_test):.4f} seconds per sample\n")
+    f.write(f"Sklearn accuracy: {sklearn_accuracy:.4f}\n")
+    f.write(f"Quantized accuracy: {quantized_accuracy:.4f}\n")
+    f.write(f"FHE accuracy: {fhe_accuracy:.4f}\n")
+    f.write(
+        f"\nRelative difference between Concrete-ml (quantized clear) and Concrete-ml (FHE) scores: {concrete_score_difference:.2f}%\n"
+    )
+    f.write(
+        f"Relative difference between scikit-learn (clear) and Concrete-ml (FHE) scores: {score_difference:.2f}%\n"
+    )
