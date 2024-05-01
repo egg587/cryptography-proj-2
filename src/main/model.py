@@ -3,6 +3,7 @@ import os
 import numpy as np 
 import pandas as pd
 import seaborn as sns
+from pathlib import Path
 import matplotlib.pyplot as plt
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression as SklearnLogisticRegression
@@ -71,7 +72,9 @@ y_pred_q = concrete_logr.predict(x_test)
 fhe_circuit = concrete_logr.compile(x_train)
 
 # Output FHE model to file
-# TODO: output dataset to a file
+fhe_model_path = Path("fhe_model.json")
+with fhe_model_path.open("w") as f:
+    concrete_logr.dump(f)
 
 print(f"Generating a key for an {fhe_circuit.graph.maximum_integer_bit_width()}-bit circuit")
 
