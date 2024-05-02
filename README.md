@@ -1,6 +1,7 @@
 # Applied Cryptography - Project 2
 
 ## Project Title: Classifiying Encrypted Health-care Data for Diabetes prediction
+## Project Title: Classifiying Encrypted Health-care Data for Diabetes prediction
 
 **Project Type 4:** Designing a cryptography solution to allow computation of an outsourced algorithm or machine learning classifier over your encrypted input (test) data via homomorphic encryption scheme<br /><br />
 
