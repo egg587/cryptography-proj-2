@@ -26,26 +26,26 @@ df.info()
 df.describe()
 
 # Create heatmap to visualize missing data
-sns.heatmap(df.isnull(),yticklabels=False,cbar=False,cmap='viridis')
+#sns.heatmap(df.isnull(),yticklabels=False,cbar=False,cmap='viridis')
 
 # Create count plot of Outcome column
-sns.countplot(x='Outcome',data=df)
+#sns.countplot(x='Outcome',data=df)
 
 # Create distribution plot for Age column
-sns.distplot(df['Age'].dropna(),kde=True)
+#sns.distplot(df['Age'].dropna(),kde=True)
 
 # Compute pairwise correlation of columns
-df.corr()
+#df.corr()
 
 # Create heatmap to visualize correlation
-sns.heatmap(df.corr())
+#sns.heatmap(df.corr())
 
 # Create pairplot to visualize relationships between columns
-sns.pairplot(df)
+#sns.pairplot(df)
 
 # Create boxplot to visualize relationship between Age and BMI
-plt.subplots(figsize=(20,15))
-sns.boxplot(x='Age', y='BMI', data=df)
+#plt.subplots(figsize=(20,15))
+#sns.boxplot(x='Age', y='BMI', data=df)
 
 # Split data into features and target
 x = df.drop('Outcome',axis=1)
@@ -142,3 +142,75 @@ with open("results.txt", "w") as f:
     f.write(
         f"Relative difference between scikit-learn (clear) and Concrete-ml (FHE) scores: {score_difference:.2f}%\n"
     )
+
+# Create visualizations for comparing the Sklearn and Comcrete-ml models
+def get_charts(x, y):
+    # Define a range of test dataset sizes to iterate over
+    test_sizes = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+
+    sklearn_accuracies = []
+    concrete_accuracies = []
+    sklearn_exec_times = []
+    concrete_exec_times = []
+
+    for test_size in test_sizes:
+        # Split data into training and testing sets
+        x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_size, random_state=101)
+
+        # Create Sklearn Logistic Regression model
+        sklearn_logr = SklearnLogisticRegression()
+        sklearn_logr.fit(x_train, y_train)
+
+        # Predict on the test set using Sklearn model
+        start_time = time.time()
+        y_pred_test = sklearn_logr.predict(x_test)
+        sklearn_exec_time = time.time() - start_time
+        sklearn_accuracy = accuracy_score(y_test, y_pred_test)
+        sklearn_accuracies.append(sklearn_accuracy)
+        sklearn_exec_times.append(sklearn_exec_time)
+
+        # Create Concrete-ml Logistic Regression model
+        concrete_logr = ConcreteLogisticRegression(n_bits=8)
+        concrete_logr.fit(x_train, y_train)
+
+        # Predict on the test set using Concrete-ml model
+        fhe_circuit = concrete_logr.compile(x_train)
+        start_time = time.time()
+        y_pred_q = concrete_logr.predict(x_test, fhe="execute")
+        concrete_exec_time = time.time() - start_time
+        concrete_accuracy = accuracy_score(y_test, y_pred_q)
+        concrete_accuracies.append(concrete_accuracy)
+        concrete_exec_times.append(concrete_exec_time)
+
+    # Plotting the comparison of accuracies vs. test dataset sizes
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+
+    # Plot Sklearn model accuracy and execution time
+    ax1.plot(test_sizes, sklearn_accuracies, label='Sklearn Model Accuracy', marker='o')
+    ax1.set_title('Sklearn Model Accuracy vs. Test Dataset Size')
+    ax1.set_xlabel('Test Dataset Size')
+    ax1.set_ylabel('Accuracy')
+    ax1.legend(loc='upper left')
+
+    ax1twin = ax1.twinx()
+    ax1twin.plot(test_sizes, sklearn_exec_times, color='r', label='Sklearn Model Execution Time', marker='x')
+    ax1twin.set_ylabel('Execution Time (seconds)')
+    ax1twin.legend(loc='upper right')
+
+    # Plot Concrete-ml model accuracy and execution time
+    ax2.plot(test_sizes, concrete_accuracies, label='Concrete-ml Model Accuracy', marker='o')
+    ax2.set_title('Concrete-ml Model Accuracy vs. Test Dataset Size')
+    ax2.set_xlabel('Test Dataset Size')
+    ax2.set_ylabel('Accuracy')
+    ax2.legend(loc='upper left')
+
+    ax2twin = ax2.twinx()
+    ax2twin.plot(test_sizes, concrete_exec_times, color='r', label='Concrete-ml Model Execution Time', marker='x')
+    ax2twin.set_ylabel('Execution Time (seconds)')
+    ax2twin.legend(loc='upper right')
+
+    plt.tight_layout()
+    plt.show()
+
+
+get_charts(x, y)

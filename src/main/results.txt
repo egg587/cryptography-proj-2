@@ -1,4 +1,4 @@
-Key generation time: 0.5554 seconds
+Key generation time: 0.5533 seconds
 Sklearn execution time: 0.0024 seconds per sample
 Quantized execution time: 0.0024 seconds per sample
 FHE execution time: 0.0024 seconds per sample
