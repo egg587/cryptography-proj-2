@@ -1,6 +1,7 @@
 import time
 
 import pandas as pd
+import os
 from sklearn.ensemble import RandomForestClassifier as SklearnRandomForestClassifier
 from sklearn.linear_model import LogisticRegression as SklearnLogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
@@ -25,8 +26,11 @@ CONCRETE_ML_MODELS = [
     ConcreteXGBoostClassifier,
 ]
 
+CURR_DIR = os.path.dirname(os.path.realpath(__file__))
+DATA_DIR = os.path.join(CURR_DIR, "data")
+
 # Read the dataset
-df = pd.read_csv("./data/diabetes.csv")
+df = pd.read_csv(DATA_DIR + "/diabetes.csv")
 
 X = df.drop(columns=["Outcome"])
 y = df["Outcome"]
@@ -155,7 +159,7 @@ def get_input_data(X_train, program_type):
         user_type = input("Would you like to enter the data manually? (y/n): ")
         if user_type.lower() == "n":
             input_file = input("Please enter the name of the input file within ./data/ (please use csv file): ")
-            input_df = pd.read_csv("data/" + input_file)
+            input_df = pd.read_csv(DATA_DIR + "/" + input_file)
         elif user_type.lower() != "y":
             print("Invalid input. Please try again.")
             return get_input_data()
