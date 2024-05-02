@@ -37,18 +37,34 @@ def load_model():
     
     return skl_model, fhe_model
 
-def get_input_data():
+def get_input_data(X_train):
     """Prompt user for input data."""
     print("Welcome to the Diabetes Prediction System!")
     print("Please enter the following information:")
-    column_headers = df.columns.drop("Outcome")
-    all_data = []
-    input_data = {}
-    for header in column_headers:
-        input_data[header] = float(input(f"{header}: "))
+
+    # Ask user for input data
+    user_type = input("Would you like to enter the data manually? (y/n): ")
+    if user_type.lower() == "n":
+        input_file = input("Please enter the name of the input file within ./data/ (please use csv file): ")
+        input_df = pd.read_csv("data/" + input_file)
+    elif user_type.lower() != "y":
+        print("Invalid input. Please try again.")
+        return get_input_data()
+    else:
+        column_headers = df.columns.drop("Outcome")
+        all_data = []
+        input_data = {}
+        for header in column_headers:
+            input_data[header] = float(input(f"{header}: "))
+        
+        # Convert input data to DataFrame for prediction
+        input_df = pd.DataFrame(input_data, index=[0])
     
-    # Convert input data to DataFrame for prediction
-    input_df = pd.DataFrame(input_data, index=[0])
+    # Check and preprocess input data
+    # Match columns and data types with training data
+    expected_columns = X_train.columns
+    input_df = input_df.reindex(columns=expected_columns, fill_value=0)  # Fill missing columns with zeros
+    input_df = input_df.astype(X_train.dtypes)  # Match data types with training data
     return input_df
 
 
@@ -79,7 +95,7 @@ def main():
     fhe_circuit = fhe_model.compile(X_train)
 
     # Prompt user for input data
-    input_data = get_input_data()
+    input_data = get_input_data(X_train)
 
     # Encrypting input data
 
@@ -90,9 +106,10 @@ def main():
     y_pred = run_prediction(fhe_model, skl_model, input_data)
     print(f"Prediction time: {time.time() - time_begin:.4f} seconds")
     print(f"Prediction: {y_pred}")
-    if y_pred == 1:
-        print("The patient is likely to have diabetes.")
-    else:
-        print("The patient is unlikely to have diabetes.")
+    for idx, y in enumerate(y_pred):
+        if y == 1:
+            print(f"For index {idx}, The patient is likely to have diabetes.")
+        else:
+            print(f"For index {idx}, The patient is unlikely to have diabetes.")
     
 main()
