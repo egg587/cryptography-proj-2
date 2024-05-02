@@ -1,8 +1,8 @@
-Key generation time: 0.7114 seconds
-Sklearn execution time: 0.0031 seconds per sample
-Quantized execution time: 0.0031 seconds per sample
-FHE execution time: 0.0031 seconds per sample
-Sklearn accuracy: 0.7922
+Key generation time: 0.5554 seconds
+Sklearn execution time: 0.0024 seconds per sample
+Quantized execution time: 0.0024 seconds per sample
+FHE execution time: 0.0024 seconds per sample
+Sklearn accuracy: 0.7965
 Quantized accuracy: 0.7662
 FHE accuracy: 0.7662
 

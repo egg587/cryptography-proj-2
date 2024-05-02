@@ -1,5 +1,6 @@
 import time
 import os
+import pickle
 import numpy as np 
 import pandas as pd
 import seaborn as sns
@@ -59,6 +60,11 @@ sklearn_logr.fit(x_train, y_train)
 
 # Predict on the test set using Sklearn model
 y_pred_test = sklearn_logr.predict(x_test)
+
+# Output Sklearn model to file
+sklearn_model_path = Path("sklearn_model.pkl")
+with sklearn_model_path.open("wb") as f:
+    pickle.dump(sklearn_logr, f)
 
 # Create Quantized Concrete-ml Logistic Regression model with 8 bits precision
 concrete_logr = ConcreteLogisticRegression(n_bits=8)
