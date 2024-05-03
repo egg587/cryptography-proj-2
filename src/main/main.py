@@ -16,7 +16,9 @@ from concrete.ml.common.serialization.loaders import load
 # CONSTANTS
 FHE_MODEL_FILE = Path("fhe_model.json")
 SKL_MODEL_FILE = Path("sklearn_model.pkl")
-df = pd.read_csv('data/diabetes.csv')
+CURR_DIR = Path(__file__).parent
+DATA_DIR = CURR_DIR / "data"
+df = pd.read_csv(DATA_DIR + '/' + 'diabetes.csv')
 
 def load_data():
     """Load inference data from user provided file."""
