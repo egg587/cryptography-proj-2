@@ -168,3 +168,6 @@ Prediction 5: Diabetic
 Execution time: 0.9194 seconds per sample
 ```
 
+#### Quick Demo:
+
+![Alt Text](./src/img/extra_credit.gif)
